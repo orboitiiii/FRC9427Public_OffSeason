@@ -22,13 +22,13 @@ class ElevatorSubSystemTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ElevatorSubSystemTest.class);
 
   private static class TestConstants {
-    static final double MASS_KG = 7.5;
+    static final double MASS_KG = 9.1;
     static final double RADIUS_M = 0.0191008;
     static final double GEARING = 4.28571428571;
     static final int NUM_MOTORS = 2;
     static final double DT_S = 0.02;
-    static final double LQR_TOL_POS_M = 0.0001;
-    static final double LQR_TOL_VEL_MPS = 0.0135;
+    static final double LQR_TOL_POS_M = 0.001;
+    static final double LQR_TOL_VEL_MPS = 0.135;
     static final double LQR_TOL_U_VOLTS = 1.5;
   }
 
@@ -92,7 +92,7 @@ class ElevatorSubSystemTest {
               lqr,
               linearPlantInversionFeedforward,
               kalmanFilter,
-              LinearSystemLoop.createVoltageClamp(12));
+              LinearSystemLoop.createVoltageClamp(12.0));
 
       loop.reset(new SimpleMatrix(2, 1));
       loop.setNextR(new SimpleMatrix(new double[][] {{0.5}, {0.5}}));

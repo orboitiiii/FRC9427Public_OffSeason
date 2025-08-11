@@ -66,12 +66,9 @@ public class Util {
 
   public static double linearDistanceToRotation(
       double linearDistance, double radius, double gearing) {
-    if (linearDistance < 0) {
-      return -linearDistanceToRotation(-linearDistance, radius, gearing);
-    }
     if (radius <= 0 || gearing <= 0) {
       throw new IllegalArgumentException("Radius and gearing must be positive.");
     }
-    return (linearDistance / (2 * radius) * Math.PI) / gearing;
+    return (linearDistance / (2 * Math.PI * radius)) * gearing;
   }
 }

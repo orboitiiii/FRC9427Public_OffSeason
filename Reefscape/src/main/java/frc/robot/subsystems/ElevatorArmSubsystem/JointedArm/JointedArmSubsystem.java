@@ -79,6 +79,12 @@ public class JointedArmSubsystem {
             () -> leftJointedArmMotor.getAbsoluteEncoder().getVelocity(),
             IDearLog.FieldType.CAN);
 
+    IDearLog.getInstance()
+        .addField(
+            "gravityFeedforwardVoltage",
+            () -> gravityFeedforwardVoltage,
+            IDearLog.FieldType.NON_CAN);
+
     stateMatrix =
         new SimpleMatrix(
             new double[][] {
