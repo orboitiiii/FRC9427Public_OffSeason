@@ -39,8 +39,9 @@ public class LinearExtensionConfigs {
             LinearExtensionConstants.Pyhsical.kMaxHeight,
             LinearExtensionConstants.System.radius,
             LinearExtensionConstants.System.G);
-    FXConfig.Feedback.SensorToMechanismRatio = LinearExtensionConstants.System.G;
-
+    FXConfig.Feedback.SensorToMechanismRatio =
+        LinearExtensionConstants.System.G
+            / (2.0 * Math.PI * LinearExtensionConstants.System.radius);
     FXConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     return FXConfig;
   }
@@ -70,7 +71,9 @@ public class LinearExtensionConfigs {
             LinearExtensionConstants.Pyhsical.kMaxHeight,
             LinearExtensionConstants.System.radius,
             LinearExtensionConstants.System.G);
-    FXConfig.Feedback.SensorToMechanismRatio = LinearExtensionConstants.System.G;
+    FXConfig.Feedback.SensorToMechanismRatio =
+        LinearExtensionConstants.System.G
+            / (2.0 * Math.PI * LinearExtensionConstants.System.radius);
 
     FXConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     return FXConfig;

@@ -7,12 +7,12 @@ public class JointedArmConfig {
     SparkMaxConfig config = new SparkMaxConfig();
     config
         .encoder
-        .positionConversionFactor(0.0)
-        .velocityConversionFactor(0.0)
+        .positionConversionFactor(0.0625)
+        .velocityConversionFactor(0.0625)
         .uvwMeasurementPeriod(10)
         .uvwAverageDepth(2);
     config
-        .inverted(true)
+        .inverted(false)
         .idleMode(SparkMaxConfig.IdleMode.kBrake)
         .smartCurrentLimit(67)
         .voltageCompensation(12.0);
@@ -26,9 +26,9 @@ public class JointedArmConfig {
         .outputCurrentPeriodMs(20);
     config
         .absoluteEncoder
-        .inverted(true)
-        .positionConversionFactor(0.0)
-        .velocityConversionFactor(0.0)
+        .inverted(false)
+        .positionConversionFactor(360)
+        .velocityConversionFactor(6)
         .zeroCentered(true)
         .averageDepth(2);
     return config;

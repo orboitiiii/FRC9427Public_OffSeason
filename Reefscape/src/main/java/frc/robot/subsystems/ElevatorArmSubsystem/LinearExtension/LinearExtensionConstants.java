@@ -5,15 +5,15 @@ import org.ejml.simple.SimpleMatrix;
 
 public final class LinearExtensionConstants {
   public static class Hardware {
-    public static final int LEFT_ELEVATOR_MOTOR_ID = 0;
-    public static final int RIGHT_ELEVATOR_MOTOR_ID = 0;
+    public static final int LEFT_ELEVATOR_MOTOR_ID = 21;
+    public static final int RIGHT_ELEVATOR_MOTOR_ID = 23;
   }
 
   public static class System {
     public static final int numMotor = 2;
     public static final double G = 4.28571428571; // 60 / 14 = 4.28571428571
     public static final double radius = 0.0191008; // meters
-    public static final double m = 9.1;
+    public static final double m = 8.608;
     public static final SimpleMatrix kalman_q =
         SimpleMatrix.diag(Math.pow(0.12, 2), Math.pow(0.20, 2));
     public static final SimpleMatrix kalman_r =

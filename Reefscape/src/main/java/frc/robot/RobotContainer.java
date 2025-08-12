@@ -6,17 +6,31 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
 import frc.robot.subsystems.ElevatorArmSubsystem.JointedArm.JointedArmSubsystem;
+import frc.robot.subsystems.ElevatorArmSubsystem.LinearExtension.LinearExtensionSubSystem;
 
 public class RobotContainer {
 
   private final JointedArmSubsystem armSubsystem = new JointedArmSubsystem();
 
+  private final LinearExtensionSubSystem linearExtensionSubSystem = new LinearExtensionSubSystem();
+
+  private final CommandPS5Controller commandPS5Controller = new CommandPS5Controller(0);
+
   public RobotContainer() {
     configureBindings();
   }
 
-  private void configureBindings() {}
+  private void configureBindings() {
+    armSubsystem.setDefaultCommand(armSubsystem.holdingCommand());
+
+    // commandPS5Controller.triangle().whileTrue(linearExtensionSubSystem.setVoltageCommand(3.0));
+    // commandPS5Controller.cross().whileTrue(linearExtensionSubSystem.setVoltageCommand(-3.0));
+    commandPS5Controller.triangle().whileTrue(armSubsystem.setVoltageCommand(1.25));
+    commandPS5Controller.cross().whileTrue(armSubsystem.setVoltageCommand(-1.25));
+    commandPS5Controller.circle().whileTrue(armSubsystem.setTargetCommand(45));
+  }
 
   public Command getAutonomousCommand() {
     return Commands.print("No autonomous command configured");

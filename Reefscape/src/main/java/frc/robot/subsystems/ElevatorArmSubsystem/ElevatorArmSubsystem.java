@@ -49,7 +49,6 @@ public class ElevatorArmSubsystem extends SubsystemBase {
     previouState = wantedState;
   }
 
-  /** 簡化：非 IDLE 一律進「計算目標與守門」流程 */
   private SystemState handleStateTransitions() {
     return (wantedState == WantedState.IDLE) ? SystemState.IDLING : SystemState.MOVING_BOTH;
   }
@@ -68,8 +67,7 @@ public class ElevatorArmSubsystem extends SubsystemBase {
         final double currArmDeg = jointedArmSubsystem.getJointedArmAngleDegrees();
         final double tgtArmDeg = wantedElevatorArmPosition.getJointedArmAngleDegrees();
 
-        // ========= 連續式守門（照 2910 思路）=========
-        // A) 特定模式：ALGAE 高位動作，手臂需先到安全角 90°
+        // 特定模式：ALGAE 高位動作，手臂需先到安全角 90°
         if (wantedState == WantedState.MOVE_TO_SCORE_TAKE_ALGAE
             && tgtElev > ElevatorArmConstants.SCORE_TAKE_ALGAE_ELEV_THRESHOLD_M
             && !MathUtil.isNear(

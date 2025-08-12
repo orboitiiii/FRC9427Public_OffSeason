@@ -15,6 +15,8 @@ import com.slsh.IDeer9427.lib.controls.plant.StateSpaceFactory;
 import com.slsh.IDeer9427.lib.data.IDearLog;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.subsystems.ElevatorArmSubsystem.LinearExtension.LinearExtensionConstants.Hardware;
@@ -79,22 +81,22 @@ public class LinearExtensionSubSystem extends SubsystemBase {
     IDearLog.getInstance()
         .addField(
             "ElevatorPosition",
-            () -> elevatorRightMotor.getPosition().getValueAsDouble(),
+            () -> elevatorLeftMotor.getPosition().getValueAsDouble(),
             IDearLog.FieldType.CAN);
     IDearLog.getInstance()
         .addField(
             "ElevatorVelocity",
-            () -> elevatorRightMotor.getVelocity().getValueAsDouble(),
+            () -> elevatorLeftMotor.getVelocity().getValueAsDouble(),
             IDearLog.FieldType.CAN);
 
     Phoenix6Util.checkErrorAndRetry(
-        () -> elevatorRightMotor.setPosition(kZERO, ROBOT_NORMAL_CAN_TIMEOUT_MS));
+        () -> elevatorLeftMotor.setPosition(kZERO, ROBOT_NORMAL_CAN_TIMEOUT_MS));
 
     stateMatrix =
         new SimpleMatrix(
             new double[][] {
-              {elevatorRightMotor.getPosition().getValueAsDouble()},
-              {elevatorRightMotor.getVelocity().getValueAsDouble()}
+              {elevatorLeftMotor.getPosition().getValueAsDouble()},
+              {elevatorLeftMotor.getVelocity().getValueAsDouble()}
             });
 
     linearSystemLoop.reset(stateMatrix);
@@ -114,15 +116,15 @@ public class LinearExtensionSubSystem extends SubsystemBase {
   }
 
   public void setVoltage(double voltage) {
-    elevatorLeftMotor.setVoltage(voltage);
+    elevatorLeftMotor.setVoltage(-voltage);
     elevatorRightMotor.setVoltage(voltage);
   }
 
   public void setReference(double desiredPosition) {
     TrapezoidProfile.State goal = new TrapezoidProfile.State(desiredPosition, 0);
     m_lastProfiledReference = m_profile.calculate(ROBOT_PERIODIC_MS, m_lastProfiledReference, goal);
-    stateMatrix.set(0, 0, elevatorRightMotor.getPosition().getValueAsDouble());
-    stateMatrix.set(1, 0, elevatorRightMotor.getVelocity().getValueAsDouble());
+    stateMatrix.set(0, 0, elevatorLeftMotor.getPosition().getValueAsDouble());
+    stateMatrix.set(1, 0, elevatorLeftMotor.getVelocity().getValueAsDouble());
     referenceMatrix.set(0, 0, desiredPosition);
     referenceMatrix.set(1, 0, m_lastProfiledReference.velocity);
     linearSystemLoop.setNextR(referenceMatrix);
@@ -132,6 +134,10 @@ public class LinearExtensionSubSystem extends SubsystemBase {
   }
 
   public double getLinearExtensionMeters() {
-    return elevatorRightMotor.getPosition().getValueAsDouble();
+    return elevatorLeftMotor.getPosition().getValueAsDouble();
+  }
+
+  public Command setVoltageCommand(double voltage) {
+    return Commands.runEnd(() -> setVoltage(voltage), () -> stop(), this);
   }
 }
