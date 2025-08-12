@@ -24,12 +24,25 @@ public class RobotContainer {
 
   private void configureBindings() {
     armSubsystem.setDefaultCommand(armSubsystem.holdingCommand());
-
-    // commandPS5Controller.triangle().whileTrue(linearExtensionSubSystem.setVoltageCommand(3.0));
-    // commandPS5Controller.cross().whileTrue(linearExtensionSubSystem.setVoltageCommand(-3.0));
-    commandPS5Controller.triangle().whileTrue(armSubsystem.setVoltageCommand(1.25));
-    commandPS5Controller.cross().whileTrue(armSubsystem.setVoltageCommand(-1.25));
-    commandPS5Controller.circle().whileTrue(armSubsystem.setTargetCommand(45));
+    linearExtensionSubSystem.setDefaultCommand(linearExtensionSubSystem.holCommand());
+    commandPS5Controller.circle().whileTrue(linearExtensionSubSystem.setVoltageCommand(3.0));
+    commandPS5Controller.square().whileTrue(linearExtensionSubSystem.setVoltageCommand(-3.0));
+    commandPS5Controller.triangle().whileTrue(linearExtensionSubSystem.setTarget(0.25));
+    // commandPS5Controller.triangle().whileTrue(armSubsystem.setVoltageCommand(1.25));
+    // commandPS5Controller.cross().whileTrue(armSubsystem.setVoltageCommand(-1.25));
+    // commandPS5Controller.square().whileTrue(armSubsystem.setTargetCommand(45));
+    // commandPS5Controller
+    //     .cross()
+    //     .whileTrue(armSubsystem.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
+    // commandPS5Controller
+    //     .triangle()
+    //     .whileTrue(armSubsystem.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
+    // commandPS5Controller
+    //     .square()
+    //     .whileTrue(armSubsystem.sysIdDynamic(SysIdRoutine.Direction.kForward));
+    // commandPS5Controller
+    //     .circle()
+    //     .whileTrue(armSubsystem.sysIdDynamic(SysIdRoutine.Direction.kReverse));
   }
 
   public Command getAutonomousCommand() {

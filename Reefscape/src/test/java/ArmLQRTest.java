@@ -19,8 +19,8 @@ class ArmLQRTest {
     static final double J = 0.015097917;
     static final double G = 16.0;
     static final int numMotor = 2;
-    static final double LQR_TOL_X_M = 0.01;
-    static final double LQR_TOL_V_MPS = 10.0;
+    static final double LQR_TOL_X_M = Math.toRadians(0.1);
+    static final double LQR_TOL_V_MPS = Math.toRadians(1.0);
     static final double LQR_TOL_U_VOLTS = 12.0;
     static final double ROBOT_PERIODIC_MS = 0.02;
   }
