@@ -16,6 +16,6 @@ public class JointedArmConstants {
 
   public static class Pyhsical {
     public static final double kMaxRadians = Math.toRadians(30.0);
-    public static final double kMaxRadiansAcceleration = Math.toRadians(10.0);
+    public static final double kMaxRadiansAcceleration = Math.toRadians(15.0);
   }
 }

@@ -1,10 +1,11 @@
-// File: src/main/java/frc/robot/subsystems/ElevatorArmSubsystem/ElevatorArmSubsystem.java
 package frc.robot.subsystems.ElevatorArmSubsystem;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.subsystems.ElevatorArmSubsystem.Constamts.ElevatorArmConstants;
-import frc.robot.subsystems.ElevatorArmSubsystem.Constamts.SetpointFactory;
+import frc.robot.subsystems.ElevatorArmSubsystem.Constants.SetpointFactory;
 import frc.robot.subsystems.ElevatorArmSubsystem.JointedArm.JointedArmSubsystem;
 import frc.robot.subsystems.ElevatorArmSubsystem.LinearExtension.LinearExtensionSubSystem;
 
@@ -12,9 +13,8 @@ public class ElevatorArmSubsystem extends SubsystemBase {
 
   public enum WantedState {
     IDLE,
-    MOVE_TO_PLACING_CORAL,
-    MOVE_TO_SCORE_TAKE_ALGAE,
-    MOVE_TO_HOME
+    MOVING_BOTH,
+    TAKEING_CORAL
   }
 
   private enum SystemState {
@@ -23,7 +23,6 @@ public class ElevatorArmSubsystem extends SubsystemBase {
   }
 
   private WantedState wantedState = WantedState.IDLE;
-  private WantedState previouState = WantedState.IDLE;
   private SystemState systemState = SystemState.IDLING;
 
   private final JointedArmSubsystem jointedArmSubsystem;
@@ -31,22 +30,18 @@ public class ElevatorArmSubsystem extends SubsystemBase {
 
   private ElevatorArmPosition wantedElevatorArmPosition;
 
-  // 由常數推導，避免硬編碼
-  private final double safetyArmAngleDeg = ElevatorArmConstants.ARM_SAFE_DEG; // 90°
-  private final double safetyElevatorMeters = ElevatorArmConstants.HOME_SAFETY_ELEV_M; // 0.15m
-
   public ElevatorArmSubsystem(
       JointedArmSubsystem jointedArmSubsystem, LinearExtensionSubSystem linearExtensionSubSystem) {
     this.jointedArmSubsystem = jointedArmSubsystem;
     this.linearExtensionSubSystem = linearExtensionSubSystem;
-    wantedElevatorArmPosition = SetpointFactory.ZEROED;
+    wantedElevatorArmPosition = SetpointFactory.TAKEING_CORAL;
   }
 
   @Override
   public void periodic() {
     systemState = handleStateTransitions();
     applyStateActions();
-    previouState = wantedState;
+    SmartDashboard.putBoolean("isZero", isZero());
   }
 
   private SystemState handleStateTransitions() {
@@ -61,80 +56,42 @@ public class ElevatorArmSubsystem extends SubsystemBase {
         return;
 
       case MOVING_BOTH:
-        // 讀當前與目標
         final double currElev = linearExtensionSubSystem.getLinearExtensionMeters();
         final double tgtElev = wantedElevatorArmPosition.getExtensionLengthMeters();
         final double currArmDeg = jointedArmSubsystem.getJointedArmAngleDegrees();
         final double tgtArmDeg = wantedElevatorArmPosition.getJointedArmAngleDegrees();
 
-        // 特定模式：ALGAE 高位動作，手臂需先到安全角 90°
-        if (wantedState == WantedState.MOVE_TO_SCORE_TAKE_ALGAE
-            && tgtElev > ElevatorArmConstants.SCORE_TAKE_ALGAE_ELEV_THRESHOLD_M
-            && !MathUtil.isNear(
-                currArmDeg, safetyArmAngleDeg, ElevatorArmConstants.TOL_ANGLE_DEG)) {
-
-          jointedArmSubsystem.setReference(safetyArmAngleDeg);
-          linearExtensionSubSystem.holdPosition();
-          return;
-        }
-
-        // B) 手臂角度過大而升降目標為上升 → 先把手臂拉回安全角
-        if (currArmDeg > ElevatorArmConstants.ARM_MOVE_UP_BEFORE_EXTEND_DEG
-            && tgtElev > currElev
-            && !MathUtil.isNear(
-                currArmDeg, safetyArmAngleDeg, ElevatorArmConstants.TOL_ANGLE_DEG)) {
-
-          jointedArmSubsystem.setReference(safetyArmAngleDeg);
-          linearExtensionSubSystem.holdPosition();
-          return;
-        }
-
-        // C) 升降幾乎在 0、手臂在 -90 且準備抬臂 → 先把升降抬到安全高度
-        if (MathUtil.isNear(currElev, 0.0, ElevatorArmConstants.TOL_ELEV_NEAR_ZERO_M)
-            && MathUtil.isNear(
-                currArmDeg,
-                ElevatorArmConstants.ARM_NEAR_NEG90_DEG,
-                ElevatorArmConstants.TOL_ANGLE_WIDE_DEG)
-            && tgtArmDeg > currArmDeg) {
-
-          jointedArmSubsystem.holdPosition();
-          linearExtensionSubSystem.setReference(safetyElevatorMeters);
-          return;
-        }
-
-        // D) 回 HOME（-90°, 0m）序列化守門
-        final boolean targetIsHome =
-            MathUtil.isNear(
-                    tgtArmDeg,
-                    ElevatorArmConstants.ARM_NEAR_NEG90_DEG,
-                    ElevatorArmConstants.TOL_ANGLE_DEG)
-                && MathUtil.isNear(tgtElev, 0.0, ElevatorArmConstants.TOL_ELEV_ZERO_TARGET_M);
-
-        if (targetIsHome) {
-          if (previouState == WantedState.MOVE_TO_SCORE_TAKE_ALGAE) {
-            if (!MathUtil.isNear(currArmDeg, 90, ElevatorArmConstants.TOL_ANGLE_DEG)) {
-              jointedArmSubsystem.setReference(safetyArmAngleDeg);
+        if (wantedState != WantedState.TAKEING_CORAL) {
+          if (tgtElev > 0.69 && tgtArmDeg > 21 && !MathUtil.isNear(currElev, tgtElev, 0.01)) {
+            jointedArmSubsystem.setReference(10);
+            if (currArmDeg < 25) {
+              linearExtensionSubSystem.setReference(tgtElev);
+            } else {
               linearExtensionSubSystem.holdPosition();
             }
-          }
-          // 低於安全高度先抬到安全高度
-          if (currElev < ElevatorArmConstants.HOME_SAFETY_ELEV_PRELIFT_BOUND_M) {
-            jointedArmSubsystem.holdPosition();
-            linearExtensionSubSystem.setReference(safetyElevatorMeters);
             return;
           }
-          // 在安全高度附近：先把手臂到 -90，再降到 0
-          if (!MathUtil.isNear(currArmDeg, tgtArmDeg, ElevatorArmConstants.TOL_ANGLE_DEG)) {
+
+          if (tgtElev < 0.25 && tgtArmDeg > -80 && !MathUtil.isNear(currElev, tgtElev, 0.01)) {
             jointedArmSubsystem.setReference(tgtArmDeg);
-            linearExtensionSubSystem.holdPosition();
+            if (tgtArmDeg > -60) {
+              linearExtensionSubSystem.setReference(tgtElev);
+            } else {
+              linearExtensionSubSystem.holdPosition();
+            }
             return;
-          } else {
-            jointedArmSubsystem.holdPosition();
-            linearExtensionSubSystem.setReference(0.0);
+          }
+
+          if (currElev < 0.25 && tgtArmDeg < -80) {
+            linearExtensionSubSystem.setReference(tgtElev);
+            if (MathUtil.isNear(currElev, tgtElev, 0.01)) {
+              jointedArmSubsystem.setReference(tgtArmDeg);
+            } else {
+              jointedArmSubsystem.holdPosition();
+            }
             return;
           }
         }
-
         jointedArmSubsystem.setReference(tgtArmDeg);
         linearExtensionSubSystem.setReference(tgtElev);
 
@@ -147,7 +104,64 @@ public class ElevatorArmSubsystem extends SubsystemBase {
     this.wantedElevatorArmPosition = position;
   }
 
+  public Command setWantedStateCommand(
+      WantedState wantedState, ElevatorArmPosition wantedElevatorArmPosition) {
+    return Commands.runOnce(() -> setWantedState(wantedState, wantedElevatorArmPosition), this);
+  }
+
   public void setIdle() {
     this.wantedState = WantedState.IDLE;
+  }
+
+  public boolean isAtSetPoint() {
+    final double currElev = linearExtensionSubSystem.getLinearExtensionMeters();
+    final double tgtElev = wantedElevatorArmPosition.getExtensionLengthMeters();
+    final double currArm = jointedArmSubsystem.getJointedArmAngleDegrees();
+    final double tgtArm = wantedElevatorArmPosition.getJointedArmAngleDegrees();
+
+    return MathUtil.isNear(currElev, tgtElev, 0.010) && MathUtil.isNear(currArm, tgtArm, 5.0);
+  }
+
+  public boolean isZero() {
+    final double currElev = linearExtensionSubSystem.getLinearExtensionMeters();
+    final double tgtElev = SetpointFactory.TAKEING_CORAL.getExtensionLengthMeters();
+    final double currArm = jointedArmSubsystem.getJointedArmAngleDegrees();
+    final double tgtArm = SetpointFactory.TAKEING_CORAL.getJointedArmAngleDegrees();
+
+    return MathUtil.isNear(currElev, tgtElev, 0.010) && MathUtil.isNear(currArm, tgtArm, 5.0);
+  }
+
+  public boolean isHome() {
+    final double currElev = linearExtensionSubSystem.getLinearExtensionMeters();
+    final double tgtElev = SetpointFactory.CORALHOME.getExtensionLengthMeters();
+    final double currArm = jointedArmSubsystem.getJointedArmAngleDegrees();
+    final double tgtArm = SetpointFactory.CORALHOME.getJointedArmAngleDegrees();
+
+    return MathUtil.isNear(currElev, tgtElev, 0.010) && MathUtil.isNear(currArm, tgtArm, 5.0);
+  }
+
+  public boolean isL4() {
+    final double currElev = linearExtensionSubSystem.getLinearExtensionMeters();
+    final double tgtElev = SetpointFactory.PRE_L4.getExtensionLengthMeters();
+    final double currArm = jointedArmSubsystem.getJointedArmAngleDegrees();
+    final double tgtArm = SetpointFactory.PRE_L4.getJointedArmAngleDegrees();
+
+    return MathUtil.isNear(currElev, tgtElev, 0.010) && MathUtil.isNear(currArm, tgtArm, 5.0);
+  }
+
+  public void setEleVoltage(double v) {
+    linearExtensionSubSystem.setVoltage(v);
+  }
+
+  public void setArmVoltage(double v) {
+    jointedArmSubsystem.setVoltage(v);
+  }
+
+  public void eleHold() {
+    linearExtensionSubSystem.holdPosition();
+  }
+
+  public void armHold() {
+    jointedArmSubsystem.holdPosition();
   }
 }

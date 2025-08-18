@@ -1,13 +1,12 @@
 package frc.robot.subsystems.ElevatorArmSubsystem.JointedArm;
 
-import com.revrobotics.spark.SparkMax;
-import com.slsh.IDeer9427.lib.data.IDearLog;
-
 import Control.Filter.KalmanFilter;
 import Control.LQR.LQRController;
 import Control.LQR.StateSpaceControlLoop;
 import Control.LQR.StateSpaceModel;
 import Control.LQR.StateSpaceSystem;
+import com.revrobotics.spark.SparkMax;
+import com.slsh.IDeer9427.lib.data.IDearLog;
 import edu.wpi.first.math.Nat;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.numbers.N1;
@@ -38,9 +37,9 @@ public class JointedArmSubsystem extends SubsystemBase {
   private final DCMotor motor = DCMotor.getNEO(System.numMotor);
 
   // Precomputed feedforward voltage to counteract gravity
-  // V_ff = (L / 3.5) * ((R * M * G) / (G * kt)) * cos(Theata)
+  // V_ff = (L / 4.75) * ((R * M * G) / (G * kt)) * cos(Theata)
   private final double gravityFeedforwardVoltage =
-      (System.L / 3.5)
+      (System.L / 4.75)
           * ((motor.rOhms * System.M * Constants.GRAVITY) / (System.G * motor.KtNMPerAmp));
 
   private final SparkMaxConfiguration motorConfig =
@@ -48,11 +47,12 @@ public class JointedArmSubsystem extends SubsystemBase {
 
   // private final PIDController controller = new PIDController(0.25, 0, 0.03);
 
-  private final TrapezoidProfile m_profile =
+  private TrapezoidProfile m_profile =
       new TrapezoidProfile(
           new TrapezoidProfile.Constraints(
               Pyhsical.kMaxRadians,
               Pyhsical.kMaxRadiansAcceleration)); // Max arm speed and acceleration.
+
   private TrapezoidProfile.State m_lastProfiledReference = new TrapezoidProfile.State();
 
   // State-space system for the arm
@@ -87,6 +87,10 @@ public class JointedArmSubsystem extends SubsystemBase {
           m_observer,
           Constants.ROBOT_NORMAL_VOLTAGE,
           Constants.ROBOT_PERIODIC_MS);
+
+  // private final double ki = 0.2;
+  // private final double kp = 0.1;
+  // private final PIDController iController = new PIDController(kp, ki, 0.0);
 
   public JointedArmSubsystem() {
     leftJointedArmMotor = motorConfig.motors()[0];
@@ -123,6 +127,10 @@ public class JointedArmSubsystem extends SubsystemBase {
     IDearLog.getInstance()
         .addField("leftVot", () -> leftJointedArmMotor.getBusVoltage(), IDearLog.FieldType.NON_CAN);
 
+    // iController.enableContinuousInput(-Math.PI, Math.PI);
+
+    // iController.setIntegratorRange(-1 / ki, 1 / ki);
+
     m_loop.reset(
         VecBuilder.fill(
             Math.toRadians(leftJointedArmMotor.getAbsoluteEncoder().getPosition()),
@@ -148,7 +156,10 @@ public class JointedArmSubsystem extends SubsystemBase {
 
   private void logTelemetry(SysIdRoutineLog log) {
     log.motor("Arm")
-        .voltage(Voltage.ofBaseUnits(leftJointedArmMotor.getBusVoltage(), Units.Volts))
+        .voltage(
+            Voltage.ofBaseUnits(
+                leftJointedArmMotor.getBusVoltage() * leftJointedArmMotor.getAppliedOutput(),
+                Units.Volts))
         .angularVelocity(
             AngularVelocity.ofBaseUnits(
                 leftJointedArmMotor.getAbsoluteEncoder().getVelocity(), Units.DegreesPerSecond))
@@ -211,12 +222,15 @@ public class JointedArmSubsystem extends SubsystemBase {
     // Retrieve constant feedforward voltage for gravity compensation
     double feedforwardVoltage =
         gravityFeedforwardVoltage * Math.cos(Math.toRadians(getJointedArmAngleDegrees()));
-    double totalVoltage = feedbackVoltage + feedforwardVoltage;
+
+    // double pi =
+    //     iController.calculate(
+    //         Math.toRadians(getJointedArmAngleDegrees()), Math.toRadians(desiredPosition));
+
+    double totalVoltage = feedforwardVoltage + feedbackVoltage;
 
     // Clamp the total voltage to within allowed limits
-    totalVoltage = Math.max(-5, Math.min(5, totalVoltage));
-
-    java.lang.System.out.println(totalVoltage);
+    totalVoltage = Math.max(-12, Math.min(12, totalVoltage));
 
     setVoltage(totalVoltage);
     // setPower(

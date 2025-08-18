@@ -4,24 +4,15 @@ import edu.wpi.first.networktables.DoublePublisher;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.Notifier;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-/**
- * Usage: - Access via CustomDataLogger.getInstance(). - Add fields with addField(name, supplier,
- * type) where type is FieldType.CAN or NON_CAN. - Start updaters in robotInit() with
- * startUpdaters(slowPeriodMs, fastPeriodMs). - Call logData() in main loop (e.g.,
- * teleopPeriodic()).
- */
 public class IDearLog {
   private static IDearLog instance;
 
   public static IDearLog getInstance() {
-    if (instance == null) {
-      instance = new IDearLog();
-    }
+    if (instance == null) instance = new IDearLog();
     return instance;
   }
 
@@ -31,100 +22,135 @@ public class IDearLog {
   }
 
   private final NetworkTable table;
+  private final DoublePublisher numFieldsPub;
+
   private final Map<String, DoublePublisher> publishers = new HashMap<>();
   private final Map<String, Supplier<Double>> canSuppliers = new HashMap<>();
   private final Map<String, Supplier<Double>> nonCanSuppliers = new HashMap<>();
   private final Map<String, Double> cache = new HashMap<>();
-  private final Object lock = new Object(); // For thread safety
+
+  private final Map<String, Double> lastSent = new HashMap<>();
+  private final Map<String, Long> lastTsMs = new HashMap<>();
+
+  private final Object lock = new Object();
   private Notifier slowNotifier;
   private Notifier fastNotifier;
 
+  private volatile double eps = 1e-3;
+  private volatile long maxStaleMs = 200;
+
   private IDearLog() {
     table = NetworkTableInstance.getDefault().getTable("CustomLogger");
+    numFieldsPub = table.getSubTable("Meta").getDoubleTopic("NumFields").publish();
+    numFieldsPub.setDefault(0.0);
   }
 
-  /**
-   * Add a field to log.
-   *
-   * @param name Field name for NetworkTables.
-   * @param supplier Lambda to fetch data (e.g., motor::getPosition).
-   * @param type CAN for slow updates, NON_CAN for fast.
-   */
+  public void setChangeEpsilon(double epsilon) {
+    this.eps = Math.max(0.0, epsilon);
+  }
+
+  public void setMaxStaleMs(long ms) {
+    this.maxStaleMs = Math.max(0, ms);
+  }
+
   public void addField(String name, Supplier<Double> supplier, FieldType type) {
-    if (publishers.containsKey(name)) {
-      return; // Avoid duplicates
-    }
-    publishers.put(name, table.getDoubleTopic(name).publish());
-    cache.put(name, 0.0);
-    if (type == FieldType.CAN) {
-      canSuppliers.put(name, supplier);
-    } else {
-      nonCanSuppliers.put(name, supplier);
+    synchronized (lock) {
+      if (publishers.containsKey(name)) return;
+      DoublePublisher pub = table.getDoubleTopic(name).publish();
+      pub.setDefault(Double.NaN);
+      publishers.put(name, pub);
+      cache.put(name, Double.NaN);
+      if (type == FieldType.CAN) canSuppliers.put(name, supplier);
+      else nonCanSuppliers.put(name, supplier);
+      numFieldsPub.set(publishers.size());
     }
   }
 
-  /**
-   * Start background updaters.
-   *
-   * @param slowPeriodMs For CAN fields (100ms).
-   * @param fastPeriodMs For non-CAN fields (20ms).
-   */
   public void startUpdaters(int slowPeriodMs, int fastPeriodMs) {
-    stopUpdaters(); // Reset if running
+    stopUpdaters();
     if (!canSuppliers.isEmpty()) {
       slowNotifier = new Notifier(new UpdaterRunnable(canSuppliers));
-      slowNotifier.startPeriodic(slowPeriodMs / 1000.0); // ms transform to seconds
+      slowNotifier.startPeriodic(slowPeriodMs / 1000.0);
     }
     if (!nonCanSuppliers.isEmpty()) {
       fastNotifier = new Notifier(new UpdaterRunnable(nonCanSuppliers));
-      fastNotifier.startPeriodic(fastPeriodMs / 1000.0); // ms transform to seconds
+      fastNotifier.startPeriodic(fastPeriodMs / 1000.0);
     }
   }
 
-  /** Stop updaters (e.g., in disabledInit()). */
   public void stopUpdaters() {
     if (slowNotifier != null) {
       slowNotifier.stop();
-      slowNotifier.close(); // release resources
+      slowNotifier.close();
       slowNotifier = null;
     }
     if (fastNotifier != null) {
       fastNotifier.stop();
-      fastNotifier.close(); // release resources
+      fastNotifier.close();
       fastNotifier = null;
     }
   }
 
-  /** Publish cached data to NetworkTables. Call in main loop—fast and non-blocking. */
   public void logData() {
+    Map<String, Double> snap;
     synchronized (lock) {
-      for (Map.Entry<String, Double> entry : cache.entrySet()) {
-        publishers.get(entry.getKey()).set(entry.getValue());
+      snap = new HashMap<>(cache);
+    }
+    long now = System.currentTimeMillis();
+
+    for (var e : snap.entrySet()) {
+      String k = e.getKey();
+      double v = e.getValue();
+      Double prev = lastSent.get(k);
+      long ts = lastTsMs.getOrDefault(k, 0L);
+
+      boolean changed = (prev == null) || !bothFiniteAndClose(prev, v, eps);
+      boolean stale = now - ts >= maxStaleMs;
+
+      if (changed || stale) {
+        DoublePublisher pub = publishers.get(k);
+        if (pub != null) {
+          pub.set(v);
+          lastSent.put(k, v);
+          lastTsMs.put(k, now);
+        }
       }
     }
-    SmartDashboard.putNumber("Logger/NumFields", publishers.size());
+    numFieldsPub.set(publishers.size());
+  }
+
+  private static boolean bothFiniteAndClose(double a, double b, double tol) {
+    if (!Double.isFinite(a) || !Double.isFinite(b)) return false;
+    return Math.abs(a - b) <= tol;
   }
 
   private class UpdaterRunnable implements Runnable {
-    private final Map<String, Supplier<Double>> suppliers;
+    private final Map<String, Supplier<Double>> suppliersRef;
 
-    public UpdaterRunnable(Map<String, Supplier<Double>> suppliers) {
-      this.suppliers = suppliers;
+    UpdaterRunnable(Map<String, Supplier<Double>> suppliers) {
+      this.suppliersRef = suppliers;
     }
 
     @Override
     public void run() {
+      Map<String, Supplier<Double>> snap;
       synchronized (lock) {
-        for (Map.Entry<String, Supplier<Double>> entry : suppliers.entrySet()) {
-          try {
-            double value = entry.getValue().get();
-            cache.put(entry.getKey(), value);
-          } catch (Exception e) {
-            System.err.println("Error updating " + entry.getKey() + ": " + e.getMessage());
-            // Optional: Cache last good value or set to NaN
-            cache.put(entry.getKey(), Double.NaN);
-          }
+        snap = new HashMap<>(suppliersRef);
+      }
+
+      Map<String, Double> newVals = new HashMap<>(snap.size());
+      for (var e : snap.entrySet()) {
+        double v;
+        try {
+          v = e.getValue().get();
+          if (!Double.isFinite(v)) v = Double.NaN;
+        } catch (Exception ex) {
+          v = Double.NaN;
         }
+        newVals.put(e.getKey(), v);
+      }
+      synchronized (lock) {
+        cache.putAll(newVals);
       }
     }
   }
